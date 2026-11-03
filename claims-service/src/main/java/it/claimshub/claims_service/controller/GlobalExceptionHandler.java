@@ -1,7 +1,6 @@
 package it.claimshub.claims_service.controller;
 
-import it.claimshub.claims_service.service.ClaimNotFoundException;
-import it.claimshub.claims_service.service.InvalidStatusTransitionException;
+import it.claimshub.claims_service.service.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -43,5 +42,20 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ApiError> build(HttpStatus status, String message) {
         return ResponseEntity.status(status)
                 .body(new ApiError(Instant.now(), status.value(), status.getReasonPhrase(), message));
+    }
+
+    @ExceptionHandler(PolicyNotFoundException.class)
+    public ResponseEntity<ApiError> policyNotFound(PolicyNotFoundException e) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler(PolicyNotActiveException.class)
+    public ResponseEntity<ApiError> policyNotActive(PolicyNotActiveException e) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler(PolicyServiceException.class)
+    public ResponseEntity<ApiError> policyServiceDown(PolicyServiceException e) {
+        return build(HttpStatus.BAD_GATEWAY, "Policy service not available");
     }
 }

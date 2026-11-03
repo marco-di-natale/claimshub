@@ -1,5 +1,6 @@
 package it.claimshub.claims_service.service;
 
+import it.claimshub.claims_service.client.PolicyClient;
 import it.claimshub.claims_service.model.Claim;
 import it.claimshub.claims_service.model.ClaimEvent;
 import it.claimshub.claims_service.model.ClaimStatus;
@@ -21,6 +22,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ClaimService {
 
+    private final PolicyClient policyClient;
+
     // stato attuale -> stati in cui può andare
     private static final Map<ClaimStatus, Set<ClaimStatus>> TRANSITIONS = Map.of(
             ClaimStatus.OPEN, Set.of(ClaimStatus.IN_REVIEW),
@@ -33,12 +36,19 @@ public class ClaimService {
     private final NotificationPublisher notifier;
 
     public Mono<Claim> create(CreateClaimRequest request, String username) {
-        Claim claim = new Claim(UUID.randomUUID().toString(), request.policyId(),
-                request.description(), request.amount(), ClaimStatus.OPEN,
-                Instant.now(), username);
-        return repository.save(claim)
-                .flatMap(saved -> record(saved, "CREATED", "Claim opened", username)
-                        .thenReturn(saved));
+        return policyClient.getPolicy(request.policyId())
+                .flatMap(policy -> {
+                    if (!"ACTIVE".equals(policy.status())) {
+                        return Mono.error(new PolicyNotActiveException(
+                                request.policyId(), policy.status()));
+                    }
+                    Claim claim = new Claim(UUID.randomUUID().toString(), request.policyId(),
+                            request.description(), request.amount(), ClaimStatus.OPEN,
+                            Instant.now(), username);
+                    return repository.save(claim)
+                            .flatMap(saved -> record(saved, "CREATED", "Claim opened", username)
+                                    .thenReturn(saved));
+                });
     }
 
     public Mono<Claim> findById(String id) {
