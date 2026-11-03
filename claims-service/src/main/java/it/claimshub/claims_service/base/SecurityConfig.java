@@ -53,10 +53,12 @@ public class SecurityConfig {
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
-            .authorizeExchange(a -> a
-                .pathMatchers("/actuator/health").permitAll()
-                .pathMatchers(HttpMethod.GET, "/api/claims/**").hasAnyRole("AGENT", "ADMIN")
-                .anyExchange().denyAll())
+                .authorizeExchange(a -> a
+                        .pathMatchers("/actuator/health").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/claims/**").hasAnyRole("AGENT", "ADMIN")
+                        .pathMatchers(HttpMethod.POST, "/api/claims").hasAnyRole("AGENT", "ADMIN")
+                        .pathMatchers(HttpMethod.PATCH, "/api/claims/*/status").hasRole("ADMIN")
+                        .anyExchange().denyAll())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(deniedHandler))
