@@ -14,8 +14,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -23,13 +21,6 @@ import java.util.UUID;
 public class ClaimService {
 
     private final PolicyClient policyClient;
-
-    // stato attuale -> stati in cui può andare
-    private static final Map<ClaimStatus, Set<ClaimStatus>> TRANSITIONS = Map.of(
-            ClaimStatus.OPEN, Set.of(ClaimStatus.IN_REVIEW),
-            ClaimStatus.IN_REVIEW, Set.of(ClaimStatus.APPROVED, ClaimStatus.REJECTED),
-            ClaimStatus.APPROVED, Set.of(),
-            ClaimStatus.REJECTED, Set.of());
 
     private final ClaimRepository repository;
     private final ClaimHistoryStore history;
@@ -62,12 +53,10 @@ public class ClaimService {
 
     public Mono<Claim> changeStatus(String id, ClaimStatus newStatus, String username) {
         return findById(id).flatMap(current -> {
-            if (!TRANSITIONS.get(current.status()).contains(newStatus)) {
+            if (!current.status().canTransitionTo(newStatus)) {
                 return Mono.error(new InvalidStatusTransitionException(current.status(), newStatus));
             }
-            Claim updated = new Claim(current.id(), current.policyId(), current.description(),
-                    current.amount(), newStatus, current.createdAt(), current.createdBy());
-            return repository.save(updated)
+            return repository.save(current.withStatus(newStatus))
                     .flatMap(saved -> record(saved, "STATUS_CHANGED",
                             current.status() + " -> " + newStatus, username)
                             .thenReturn(saved));
