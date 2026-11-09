@@ -17,18 +17,20 @@ public class InMemoryClaimRepository implements ClaimRepository {
 
     @Override
     public Mono<Claim> save(Claim claim) {
-        store.put(claim.id(), claim);
-        return Mono.just(claim);
+        return Mono.fromSupplier(() -> {
+            store.put(claim.id(), claim);
+            return claim;
+        });
     }
 
     @Override
     public Mono<Claim> findById(String id) {
-        return Mono.justOrEmpty(store.get(id));
+        return Mono.fromSupplier(() -> store.get(id));   // null = Mono vuoto
     }
 
     @Override
     public Flux<Claim> findAll() {
-        return Flux.fromIterable(store.values())
-                   .sort(Comparator.comparing(Claim::createdAt));
+        return Flux.defer(() -> Flux.fromIterable(store.values()))
+                .sort(Comparator.comparing(Claim::createdAt));
     }
 }

@@ -18,12 +18,12 @@ public class InMemoryClaimHistoryStore implements ClaimHistoryStore {
 
     @Override
     public Mono<Void> append(ClaimEvent event) {
-        events.computeIfAbsent(event.claimId(), k -> new CopyOnWriteArrayList<>()).add(event);
-        return Mono.empty();
+        return Mono.fromRunnable(() ->
+                events.computeIfAbsent(event.claimId(), k -> new CopyOnWriteArrayList<>()).add(event));
     }
 
     @Override
     public Flux<ClaimEvent> findByClaimId(String claimId) {
-        return Flux.fromIterable(events.getOrDefault(claimId, List.of()));
+        return Flux.defer(() -> Flux.fromIterable(events.getOrDefault(claimId, List.of())));
     }
 }

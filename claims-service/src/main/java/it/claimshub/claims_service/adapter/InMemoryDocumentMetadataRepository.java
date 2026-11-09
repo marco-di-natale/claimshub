@@ -17,19 +17,21 @@ public class InMemoryDocumentMetadataRepository implements DocumentMetadataRepos
 
     @Override
     public Mono<DocumentInfo> save(DocumentInfo info) {
-        store.put(info.id(), info);
-        return Mono.just(info);
+        return Mono.fromSupplier(() -> {
+            store.put(info.id(), info);
+            return info;
+        });
     }
 
     @Override
     public Mono<DocumentInfo> findById(String id) {
-        return Mono.justOrEmpty(store.get(id));
+        return Mono.fromSupplier(() -> store.get(id));
     }
 
     @Override
     public Flux<DocumentInfo> findByClaimId(String claimId) {
-        return Flux.fromIterable(store.values())
-                   .filter(d -> d.claimId().equals(claimId))
-                   .sort(Comparator.comparing(DocumentInfo::uploadedAt));
+        return Flux.defer(() -> Flux.fromIterable(store.values()))
+                .filter(d -> d.claimId().equals(claimId))
+                .sort(Comparator.comparing(DocumentInfo::uploadedAt));
     }
 }

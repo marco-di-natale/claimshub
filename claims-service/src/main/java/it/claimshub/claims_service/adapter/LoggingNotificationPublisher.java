@@ -11,7 +11,7 @@ public class LoggingNotificationPublisher implements NotificationPublisher {
 
     @Override
     public Mono<Void> publish(String type, String claimId, String message) {
-        log.info("[SQS-simulato] type={} claimId={} message={}", type, claimId, message);
-        return Mono.empty();
+        return Mono.fromRunnable(() ->
+                log.info("[SQS-simulato] type={} claimId={} message={}", type, claimId, message));
     }
 }
