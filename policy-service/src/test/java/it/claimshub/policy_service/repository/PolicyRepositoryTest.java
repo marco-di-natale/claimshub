@@ -137,4 +137,15 @@ class PolicyRepositoryTest {
         assertEquals(2, homeActive.count());
         assertEquals(0, new BigDecimal("590.50").compareTo(homeActive.totalPremium()));
     }
+
+    @Test
+    void search_byStartDateRange() {
+        var criteria = new PolicySearchCriteria(null, null, null, null, null,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 6, 30));
+
+        var result = repository.search(criteria, 0, 10, "id", false);
+
+        assertEquals(1, result.totalElements());
+        assertEquals("POL-0002", result.content().get(0).policyNumber());
+    }
 }
