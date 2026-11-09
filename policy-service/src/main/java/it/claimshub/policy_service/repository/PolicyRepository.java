@@ -61,47 +61,26 @@ public class PolicyRepository {
 
     public PageResult<Policy> search(PolicySearchCriteria c, int page, int size,
                                      String sortBy, boolean desc) {
-        var params = new MapSqlParameterSource();
-        var where = new StringBuilder(" WHERE 1=1");
-
-        if (c.type() != null) {
-            where.append(" AND policy_type = :type");
-            params.addValue("type", c.type().name());
-        }
-        if (c.status() != null) {
-            where.append(" AND status = :status");
-            params.addValue("status", c.status().name());
-        }
-        if (c.minPremium() != null) {
-            where.append(" AND premium >= :minPremium");
-            params.addValue("minPremium", c.minPremium());
-        }
-        if (c.maxPremium() != null) {
-            where.append(" AND premium <= :maxPremium");
-            params.addValue("maxPremium", c.maxPremium());
-        }
-        if (c.holderName() != null && !c.holderName().isBlank()) {
-            where.append(" AND UPPER(holder_name) LIKE :holder");
-            params.addValue("holder", "%" + c.holderName().toUpperCase() + "%");
-        }
-        if (c.startFrom() != null) {
-            where.append(" AND start_date >= :startFrom");
-            params.addValue("startFrom", c.startFrom());
-        }
-        if (c.startTo() != null) {
-            where.append(" AND start_date <= :startTo");
-            params.addValue("startTo", c.startTo());
-        }
+        var where = new WhereClause()
+                .and("policy_type = :type", "type", nameOf(c.type()))
+                .and("status = :status", "status", nameOf(c.status()))
+                .and("premium >= :minPremium", "minPremium", c.minPremium())
+                .and("premium <= :maxPremium", "maxPremium", c.maxPremium())
+                .and("UPPER(holder_name) LIKE :holder", "holder", likePattern(c.holderName()))
+                .and("start_date >= :startFrom", "startFrom", c.startFrom())
+                .and("start_date <= :startTo", "startTo", c.startTo());
 
         // la colonna di ordinamento NON arriva mai dall'utente: whitelist contro SQL injection
         String orderCol = SORTABLE.getOrDefault(sortBy, "id");
 
-        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM policy" + where, params, Long.class);
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM policy" + where.sql(),
+                where.params(), Long.class);
 
-        params.addValue("offset", (long) page * size);
-        params.addValue("size", size);
+        var params = where.params()
+                .addValue("offset", (long) page * size)
+                .addValue("size", size);
         List<Policy> content = jdbc.query(
-                "SELECT * FROM policy" + where
+                "SELECT * FROM policy" + where.sql()
                         + " ORDER BY " + orderCol + (desc ? " DESC" : " ASC") + ", id"
                         + " OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY",
                 params, MAPPER);
@@ -120,5 +99,13 @@ public class PolicyRepository {
                 PolicyStatus.valueOf(rs.getString("status")),
                 rs.getLong("cnt"),
                 rs.getBigDecimal("total")));
+    }
+
+    private static String nameOf(Enum<?> e) {
+        return e == null ? null : e.name();
+    }
+
+    private static String likePattern(String text) {
+        return (text == null || text.isBlank()) ? null : "%" + text.toUpperCase() + "%";
     }
 }
