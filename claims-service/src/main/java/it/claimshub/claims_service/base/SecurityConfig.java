@@ -58,6 +58,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/claims/**").hasAnyRole("AGENT", "ADMIN")
                         .pathMatchers(HttpMethod.POST, "/api/claims").hasAnyRole("AGENT", "ADMIN")
                         .pathMatchers(HttpMethod.PATCH, "/api/claims/*/status").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.POST, "/api/claims/*/documents").hasAnyRole("AGENT", "ADMIN")
                         .anyExchange().denyAll())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(entryPoint)

@@ -46,16 +46,31 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PolicyNotFoundException.class)
     public ResponseEntity<ApiError> policyNotFound(PolicyNotFoundException e) {
-        return build(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
     }
 
     @ExceptionHandler(PolicyNotActiveException.class)
     public ResponseEntity<ApiError> policyNotActive(PolicyNotActiveException e) {
-        return build(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
     }
 
     @ExceptionHandler(PolicyServiceException.class)
     public ResponseEntity<ApiError> policyServiceDown(PolicyServiceException e) {
         return build(HttpStatus.BAD_GATEWAY, "Policy service not available");
+    }
+
+    @ExceptionHandler(DocumentNotFoundException.class)
+    public ResponseEntity<ApiError> documentNotFound(DocumentNotFoundException e) {
+        return build(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidDocumentException.class)
+    public ResponseEntity<ApiError> invalidDocument(InvalidDocumentException e) {
+        return build(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(DocumentTooLargeException.class)
+    public ResponseEntity<ApiError> tooLarge(DocumentTooLargeException e) {
+        return build(HttpStatus.CONTENT_TOO_LARGE, e.getMessage());
     }
 }

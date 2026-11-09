@@ -1,13 +1,12 @@
 package it.claimshub.claims_service.controller;
 
-import it.claimshub.claims_service.model.Claim;
-import it.claimshub.claims_service.model.ClaimEvent;
-import it.claimshub.claims_service.model.CreateClaimRequest;
-import it.claimshub.claims_service.model.UpdateStatusRequest;
+import it.claimshub.claims_service.model.*;
 import it.claimshub.claims_service.service.ClaimService;
+import it.claimshub.claims_service.service.DocumentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.*;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +24,7 @@ public class ClaimsController {
     }
 
     private final ClaimService service;
+    private final DocumentService documentService;
 
     @GetMapping("/whoami")
     public Mono<WhoAmI> whoami(@AuthenticationPrincipal Jwt jwt) {
@@ -58,5 +58,28 @@ public class ClaimsController {
                                     @Valid @RequestBody UpdateStatusRequest request,
                                     @AuthenticationPrincipal Jwt jwt) {
         return service.changeStatus(id, request.status(), jwt.getSubject());
+    }
+
+    @PostMapping(value = "/{id}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public Mono<DocumentInfo> upload(@PathVariable String id,
+                                     @RequestPart("file") Mono<FilePart> file,
+                                     @AuthenticationPrincipal Jwt jwt) {
+        return file.flatMap(f -> documentService.upload(id, f, jwt.getSubject()));
+    }
+
+    @GetMapping("/{id}/documents")
+    public Flux<DocumentInfo> documents(@PathVariable String id) {
+        return documentService.list(id);
+    }
+
+    @GetMapping("/{id}/documents/{docId}")
+    public Mono<ResponseEntity<byte[]>> download(@PathVariable String id, @PathVariable String docId) {
+        return documentService.download(id, docId).map(d -> ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(d.info().contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(d.info().fileName()).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .body(d.content()));
     }
 }
