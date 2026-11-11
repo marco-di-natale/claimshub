@@ -3,6 +3,7 @@ package it.claimshub.policy_service.controller;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,7 +22,9 @@ public class AuthController {
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
     public record TokenResponse(String accessToken, String tokenType, long expiresIn) {}
 
-    private static final long TTL_SECONDS = 3600;
+    // prima: private static final long TTL_SECONDS = 3600;
+    @Value("${app.jwt.ttl-seconds:3600}")
+    private long ttlSeconds;
 
     private final UserDetailsService users;
     private final PasswordEncoder encoder;
@@ -47,12 +50,12 @@ public class AuthController {
                 .issuer("claimshub")
                 .subject(user.getUsername())
                 .issuedAt(now)
-                .expiresAt(now.plusSeconds(TTL_SECONDS))
+                .expiresAt(now.plusSeconds(ttlSeconds))
                 .claim("roles", roles)
                 .build();
         String token = jwtEncoder.encode(
                 JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
-        return new TokenResponse(token, "Bearer", TTL_SECONDS);
+        return new TokenResponse(token, "Bearer", ttlSeconds);
     }
 }
