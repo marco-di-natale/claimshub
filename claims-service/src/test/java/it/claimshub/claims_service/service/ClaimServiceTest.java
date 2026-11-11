@@ -7,7 +7,6 @@ import it.claimshub.claims_service.model.ClaimStatus;
 import it.claimshub.claims_service.model.CreateClaimRequest;
 import it.claimshub.claims_service.port.ClaimHistoryStore;
 import it.claimshub.claims_service.port.ClaimRepository;
-import it.claimshub.claims_service.port.NotificationPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -35,7 +34,7 @@ class ClaimServiceTest {
     @Mock
     ClaimHistoryStore history;
     @Mock
-    NotificationPublisher notifier;
+    ClaimAudit audit;
     @Mock
     PolicyClient policyClient;
 
@@ -54,7 +53,7 @@ class ClaimServiceTest {
     // storico e notifica "vanno a buon fine"
     private void stubSideEffects() {
         lenient().when(history.append(any())).thenReturn(Mono.empty());
-        lenient().when(notifier.publish(any(), any(), any())).thenReturn(Mono.empty());
+        lenient().when(audit.record(any(), any(), any(), any())).thenReturn(Mono.empty());
     }
 
     // ---------- create ----------
@@ -74,8 +73,7 @@ class ClaimServiceTest {
                 })
                 .verifyComplete();
 
-        verify(history).append(any());
-        verify(notifier).publish(eq("CREATED"), any(), any());
+        verify(audit).record(any(), eq("CREATED"), any(), eq("agent"));
     }
 
     @Test
@@ -87,7 +85,7 @@ class ClaimServiceTest {
                 .expectError(PolicyNotActiveException.class)
                 .verify();
 
-        verifyNoInteractions(repository, history, notifier);
+        verifyNoInteractions(repository, history, audit);
     }
 
     @Test
@@ -99,7 +97,7 @@ class ClaimServiceTest {
                 .expectError(PolicyNotFoundException.class)
                 .verify();
 
-        verifyNoInteractions(repository, history, notifier);
+        verifyNoInteractions(repository, history, audit);
     }
 
     // ---------- findById ----------
@@ -145,13 +143,13 @@ class ClaimServiceTest {
             StepVerifier.create(result)
                     .assertNext(c -> assertEquals(to, c.status()))
                     .verifyComplete();
-            verify(notifier).publish(eq("STATUS_CHANGED"), eq("c1"), any());
+            verify(audit).record(eq("c1"), eq("STATUS_CHANGED"), any(), eq("admin"));
         } else {
             StepVerifier.create(result)
                     .expectError(InvalidStatusTransitionException.class)
                     .verify();
             verify(repository, never()).save(any());
-            verifyNoInteractions(history, notifier);
+            verifyNoInteractions(history, audit);
         }
     }
 

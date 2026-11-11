@@ -1,11 +1,8 @@
 package it.claimshub.claims_service.service;
 
-import it.claimshub.claims_service.model.ClaimEvent;
 import it.claimshub.claims_service.model.DocumentInfo;
-import it.claimshub.claims_service.port.ClaimHistoryStore;
 import it.claimshub.claims_service.port.DocumentMetadataRepository;
 import it.claimshub.claims_service.port.DocumentStore;
-import it.claimshub.claims_service.port.NotificationPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.core.io.buffer.DataBufferUtils;
@@ -32,8 +29,7 @@ public class DocumentService {
     private final ClaimService claimService;
     private final DocumentStore store;
     private final DocumentMetadataRepository metadata;
-    private final ClaimHistoryStore history;
-    private final NotificationPublisher notifier;
+    private final ClaimAudit audit;
 
     public Mono<DocumentInfo> upload(String claimId, FilePart file, String username) {
         MediaType mediaType = file.headers().getContentType();
@@ -54,9 +50,7 @@ public class DocumentService {
                             contentType, bytes.length, Instant.now(), username);
                     return store.put(docId, bytes)
                             .then(metadata.save(info))
-                            .then(history.append(new ClaimEvent(claimId, Instant.now(),
-                                    "DOCUMENT_ADDED", info.fileName(), username)))
-                            .then(notifier.publish("DOCUMENT_ADDED", claimId, info.fileName()))
+                            .then(audit.record(claimId, "DOCUMENT_ADDED", info.fileName(), username))
                             .thenReturn(info);
                 });
     }
@@ -80,7 +74,7 @@ public class DocumentService {
                 .map(buffer -> {
                     try {
                         byte[] bytes = new byte[buffer.readableByteCount()];
-                        buffer.asByteBuffer().get(bytes);
+                        buffer.toByteBuffer().get(bytes);
                         return bytes;
                     } finally {
                         DataBufferUtils.release(buffer);

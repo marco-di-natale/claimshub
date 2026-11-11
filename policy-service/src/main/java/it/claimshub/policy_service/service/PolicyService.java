@@ -13,10 +13,6 @@ public class PolicyService {
 
     private final PolicyRepository repository;
 
-    public List<Policy> findAll() {
-        return repository.findAll();
-    }
-
     public Policy findById(long id) {
         return repository.findById(id).orElseThrow(() -> new PolicyNotFoundException(id));
     }

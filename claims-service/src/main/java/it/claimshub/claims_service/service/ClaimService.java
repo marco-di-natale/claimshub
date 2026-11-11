@@ -7,7 +7,6 @@ import it.claimshub.claims_service.model.ClaimStatus;
 import it.claimshub.claims_service.model.CreateClaimRequest;
 import it.claimshub.claims_service.port.ClaimHistoryStore;
 import it.claimshub.claims_service.port.ClaimRepository;
-import it.claimshub.claims_service.port.NotificationPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -24,7 +23,7 @@ public class ClaimService {
 
     private final ClaimRepository repository;
     private final ClaimHistoryStore history;
-    private final NotificationPublisher notifier;
+    private final ClaimAudit audit;
 
     public Mono<Claim> create(CreateClaimRequest request, String username) {
         return policyClient.getPolicy(request.policyId())
@@ -37,7 +36,7 @@ public class ClaimService {
                             request.description(), request.amount(), ClaimStatus.OPEN,
                             Instant.now(), username);
                     return repository.save(claim)
-                            .flatMap(saved -> record(saved, "CREATED", "Claim opened", username)
+                            .flatMap(saved -> audit.record(saved.id(), "CREATED", "Claim opened", username)
                                     .thenReturn(saved));
                 });
     }
@@ -57,8 +56,7 @@ public class ClaimService {
                 return Mono.error(new InvalidStatusTransitionException(current.status(), newStatus));
             }
             return repository.save(current.withStatus(newStatus))
-                    .flatMap(saved -> record(saved, "STATUS_CHANGED",
-                            current.status() + " -> " + newStatus, username)
+                    .flatMap(saved -> audit.record(saved.id(), "STATUS_CHANGED", current.status() + " -> " + newStatus, username)
                             .thenReturn(saved));
         });
     }
@@ -67,10 +65,4 @@ public class ClaimService {
         return findById(id).thenMany(history.findByClaimId(id));
     }
 
-    // scrive lo storico e manda la notifica, poi restituisce "fatto"
-    private Mono<Void> record(Claim claim, String type, String detail, String actor) {
-        ClaimEvent event = new ClaimEvent(claim.id(), Instant.now(), type, detail, actor);
-        return history.append(event)
-                .then(notifier.publish(type, claim.id(), detail));
-    }
 }

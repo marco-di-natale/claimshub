@@ -28,10 +28,6 @@ public class PolicyRepository {
             rs.getObject("start_date", LocalDate.class),
             rs.getObject("end_date", LocalDate.class));
 
-    public List<Policy> findAll() {
-        return jdbc.query("SELECT * FROM policy ORDER BY id", MAPPER);
-    }
-
     public Optional<Policy> findById(long id) {
         return jdbc.query("SELECT * FROM policy WHERE id = :id",
                 Map.of("id", id), MAPPER).stream().findFirst();
