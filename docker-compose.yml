@@ -1,0 +1,26 @@
+services:
+
+  policy-service:
+    build: ./policy-service
+    ports:
+      - "8080:8080"
+    environment:
+      # il segreto arriva dall'ambiente della shell (o da un file .env ignorato da Git)
+      JWT_SECRET: ${JWT_SECRET:?Imposta JWT_SECRET prima di avviare}
+
+  claims-service:
+    build: ./claims-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - policy-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Imposta JWT_SECRET prima di avviare}
+      # dentro la rete di compose i servizi si raggiungono per nome
+      APP_POLICY_SERVICE_URL: http://policy-service:8080
+      APP_DOCUMENTS_DIR: /data/documents
+    volumes:
+      - claims-documents:/data/documents
+
+volumes:
+  claims-documents:
