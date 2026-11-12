@@ -1,0 +1,16 @@
+# Jenkins locale per esercizio. Avvio:
+#   docker compose -f docker-compose.ci.yml up -d --build
+services:
+
+  jenkins:
+    build: ./jenkins
+    user: root
+    ports:
+      - "8088:8080"      # 8088 per non scontrarsi con policy-service (8080)
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      # lo stesso Docker dell'host: le immagini costruite dalla pipeline compaiono in "docker images"
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  jenkins-home:
