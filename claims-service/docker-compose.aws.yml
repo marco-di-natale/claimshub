@@ -1,0 +1,26 @@
+# Aggiunge un emulatore AWS locale e attiva il profilo "aws" su claims-service.
+# Avvio:
+#   docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d --build
+# Richiede LOCALSTACK_AUTH_TOKEN nel file .env (ignorato da Git).
+services:
+
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:?Imposta LOCALSTACK_AUTH_TOKEN nel file .env}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  claims-service:
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: aws
+      # dentro la rete di compose l'emulatore si raggiunge per nome
+      APP_AWS_ENDPOINT: http://localstack:4566
