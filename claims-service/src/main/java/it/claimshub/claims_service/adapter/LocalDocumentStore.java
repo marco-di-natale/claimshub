@@ -2,6 +2,7 @@ package it.claimshub.claims_service.adapter;
 
 import it.claimshub.claims_service.port.DocumentStore;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -12,6 +13,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 
 @Component
+@Profile("!aws")
 public class LocalDocumentStore implements DocumentStore {
 
     private final Path root;

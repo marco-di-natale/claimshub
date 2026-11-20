@@ -2,6 +2,7 @@ package it.claimshub.claims_service.adapter;
 
 import it.claimshub.claims_service.model.ClaimEvent;
 import it.claimshub.claims_service.port.ClaimHistoryStore;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -12,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Component
+@Profile("!aws")
 public class InMemoryClaimHistoryStore implements ClaimHistoryStore {
 
     private final Map<String, List<ClaimEvent>> events = new ConcurrentHashMap<>();
