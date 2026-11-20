@@ -1,10 +1,7 @@
 package it.claimshub.claims_service.service;
 
 import it.claimshub.claims_service.client.PolicyClient;
-import it.claimshub.claims_service.model.Claim;
-import it.claimshub.claims_service.model.ClaimEvent;
-import it.claimshub.claims_service.model.ClaimStatus;
-import it.claimshub.claims_service.model.CreateClaimRequest;
+import it.claimshub.claims_service.model.*;
 import it.claimshub.claims_service.port.ClaimHistoryStore;
 import it.claimshub.claims_service.port.ClaimRepository;
 import lombok.RequiredArgsConstructor;
@@ -46,8 +43,20 @@ public class ClaimService {
                 .switchIfEmpty(Mono.error(new ClaimNotFoundException(id)));
     }
 
-    public Flux<Claim> findAll() {
-        return repository.findAll();
+    public Mono<PageResult<Claim>> search(ClaimSearchCriteria criteria, int page, int size,
+                                          ClaimSortField sortBy, boolean desc) {
+        if (page < 0 || size < 1 || size > 100) {
+            return Mono.error(new InvalidSearchException("page must be >= 0 and size between 1 and 100"));
+        }
+        if (criteria.minAmount() != null && criteria.maxAmount() != null
+                && criteria.minAmount().compareTo(criteria.maxAmount()) > 0) {
+            return Mono.error(new InvalidSearchException("minAmount must not exceed maxAmount"));
+        }
+        if (criteria.createdFrom() != null && criteria.createdTo() != null
+                && criteria.createdFrom().isAfter(criteria.createdTo())) {
+            return Mono.error(new InvalidSearchException("createdFrom must not be after createdTo"));
+        }
+        return repository.search(criteria, page, size, sortBy, desc);
     }
 
     public Mono<Claim> changeStatus(String id, ClaimStatus newStatus, String username) {

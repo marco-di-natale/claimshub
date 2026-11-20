@@ -5,6 +5,7 @@ import it.claimshub.claims_service.service.ClaimService;
 import it.claimshub.claims_service.service.DocumentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -32,8 +35,20 @@ public class ClaimsController {
     }
 
     @GetMapping
-    public Flux<Claim> list() {
-        return service.findAll();
+    public Mono<PageResult<Claim>> search(
+            @RequestParam(required = false) ClaimStatus status,
+            @RequestParam(required = false) Long policyId,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "CREATED_AT") ClaimSortField sortBy,
+            @RequestParam(defaultValue = "true") boolean desc) {
+        var criteria = new ClaimSearchCriteria(status, policyId, minAmount, maxAmount,
+                createdFrom, createdTo);
+        return service.search(criteria, page, size, sortBy, desc);
     }
 
     @GetMapping("/{id}")

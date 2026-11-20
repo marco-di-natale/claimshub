@@ -73,4 +73,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> tooLarge(DocumentTooLargeException e) {
         return build(HttpStatus.CONTENT_TOO_LARGE, e.getMessage());
     }
+
+    @ExceptionHandler(InvalidSearchException.class)
+    public ResponseEntity<ApiError> invalidSearch(InvalidSearchException e) {
+        return build(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
 }
