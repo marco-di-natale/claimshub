@@ -1,5 +1,6 @@
 package it.claimshub.policy_service.controller;
 
+import it.claimshub.policy_service.service.InvalidPolicyStateException;
 import it.claimshub.policy_service.service.PolicyNotFoundException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -48,5 +49,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiError> badCredentials(BadCredentialsException e) {
         return build(HttpStatus.UNAUTHORIZED, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPolicyStateException.class)
+    public ResponseEntity<ApiError> invalidState(InvalidPolicyStateException e) {
+        return build(HttpStatus.CONFLICT, e.getMessage());
     }
 }

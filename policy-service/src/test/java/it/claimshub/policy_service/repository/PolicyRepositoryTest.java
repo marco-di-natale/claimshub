@@ -148,4 +148,23 @@ class PolicyRepositoryTest {
         assertEquals(1, result.totalElements());
         assertEquals("POL-0002", result.content().get(0).policyNumber());
     }
+
+    @Test
+    void transition_updatesWhenStatusMatches() {
+        boolean done = repository.transition(1L, PolicyStatus.ACTIVE, PolicyStatus.CANCELLED,
+                LocalDate.of(2026, 12, 31));
+
+        assertTrue(done);
+        assertEquals(PolicyStatus.CANCELLED, repository.findById(1L).orElseThrow().status());
+    }
+
+    @Test
+    void transition_doesNothingWhenStatusDiffers() {
+        // POL-0003 è EXPIRED: aspettarsi ACTIVE non deve modificare nulla
+        boolean done = repository.transition(3L, PolicyStatus.ACTIVE, PolicyStatus.CANCELLED,
+                LocalDate.of(2026, 12, 31));
+
+        assertFalse(done);
+        assertEquals(PolicyStatus.EXPIRED, repository.findById(3L).orElseThrow().status());
+    }
 }

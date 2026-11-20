@@ -76,6 +76,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/policies/**").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/policies/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/policies/*/cancel", "/api/policies/*/renew").hasRole("ADMIN")
                         .anyRequest().denyAll())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(entryPoint)

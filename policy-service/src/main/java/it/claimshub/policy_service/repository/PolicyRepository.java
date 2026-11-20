@@ -97,6 +97,20 @@ public class PolicyRepository {
                 rs.getBigDecimal("total")));
     }
 
+    // aggiorna solo se lo stato è ancora quello che il service aveva letto
+    public boolean transition(long id, PolicyStatus expected, PolicyStatus newStatus, LocalDate newEndDate) {
+        int rows = jdbc.update("""
+        UPDATE policy SET status = :newStatus, end_date = :endDate
+        WHERE id = :id AND status = :expected
+        """,
+                new MapSqlParameterSource()
+                        .addValue("id", id)
+                        .addValue("expected", expected.name())
+                        .addValue("newStatus", newStatus.name())
+                        .addValue("endDate", newEndDate));
+        return rows == 1;
+    }
+
     private static String nameOf(Enum<?> e) {
         return e == null ? null : e.name();
     }

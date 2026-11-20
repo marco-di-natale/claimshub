@@ -49,4 +49,10 @@ public class PolicyController {
     public Policy create(@Valid @RequestBody CreatePolicyRequest request) {
         return service.create(request);
     }
+
+    @PatchMapping("/{id}/cancel")
+    public Policy cancel(@PathVariable long id) { return service.cancel(id); }
+
+    @PatchMapping("/{id}/renew")
+    public Policy renew(@PathVariable long id) { return service.renew(id); }
 }
