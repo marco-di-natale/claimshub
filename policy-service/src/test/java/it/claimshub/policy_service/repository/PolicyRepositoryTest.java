@@ -1,9 +1,6 @@
 package it.claimshub.policy_service.repository;
 
-import it.claimshub.policy_service.model.Policy;
-import it.claimshub.policy_service.model.PolicySearchCriteria;
-import it.claimshub.policy_service.model.PolicyStatus;
-import it.claimshub.policy_service.model.PolicyType;
+import it.claimshub.policy_service.model.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -45,7 +42,7 @@ class PolicyRepositoryTest {
 
     @Test
     void search_withoutFilters_returnsAllFive() {
-        var result = repository.search(criteria(null, null, null, null, null), 0, 10, "id", false);
+        var result = repository.search(criteria(null, null, null, null, null), 0, 10, PolicySortField.ID, false);
 
         assertEquals(5, result.totalElements());
         assertEquals(5, result.content().size());
@@ -53,7 +50,7 @@ class PolicyRepositoryTest {
 
     @Test
     void search_byType() {
-        var result = repository.search(criteria(PolicyType.AUTO, null, null, null, null), 0, 10, "id", false);
+        var result = repository.search(criteria(PolicyType.AUTO, null, null, null, null), 0, 10, PolicySortField.ID, false);
 
         assertEquals(2, result.totalElements());
     }
@@ -61,7 +58,7 @@ class PolicyRepositoryTest {
     @Test
     void search_byStatusAndMinPremium() {
         var result = repository.search(
-                criteria(null, PolicyStatus.ACTIVE, new BigDecimal("300"), null, null), 0, 10, "id", false);
+                criteria(null, PolicyStatus.ACTIVE, new BigDecimal("300"), null, null), 0, 10, PolicySortField.ID, false);
 
         assertEquals(2, result.totalElements());
     }
@@ -69,14 +66,14 @@ class PolicyRepositoryTest {
     @Test
     void search_byPremiumRange() {
         var result = repository.search(
-                criteria(null, null, new BigDecimal("300"), new BigDecimal("500"), null), 0, 10, "id", false);
+                criteria(null, null, new BigDecimal("300"), new BigDecimal("500"), null), 0, 10, PolicySortField.ID, false);
 
         assertEquals(2, result.totalElements());
     }
 
     @Test
     void search_byHolderName_isCaseInsensitive() {
-        var result = repository.search(criteria(null, null, null, null, "ros"), 0, 10, "id", false);
+        var result = repository.search(criteria(null, null, null, null, "ros"), 0, 10, PolicySortField.ID, false);
 
         assertEquals(1, result.totalElements());
         assertEquals("Mario Rossi", result.content().get(0).holderName());
@@ -84,7 +81,7 @@ class PolicyRepositoryTest {
 
     @Test
     void search_paginationReturnsRightSlice_andFullTotal() {
-        var result = repository.search(criteria(null, null, null, null, null), 1, 2, "id", false);
+        var result = repository.search(criteria(null, null, null, null, null), 1, 2, PolicySortField.ID, false);
 
         assertEquals(5, result.totalElements());
         assertEquals(2, result.content().size());
@@ -93,18 +90,9 @@ class PolicyRepositoryTest {
 
     @Test
     void search_sortsByPremiumDescending() {
-        var result = repository.search(criteria(null, null, null, null, null), 0, 10, "premium", true);
+        var result = repository.search(criteria(null, null, null, null, null), 0, 10, PolicySortField.PREMIUM, true);
 
         assertEquals("POL-0003", result.content().get(0).policyNumber()); // premio 900
-    }
-
-    @Test
-    void search_unknownSortColumn_fallsBackToId_insteadOfInjectingSql() {
-        var result = repository.search(criteria(null, null, null, null, null),
-                0, 10, "id; DROP TABLE policy", false);
-
-        assertEquals(5, result.totalElements());
-        assertEquals("POL-0001", result.content().get(0).policyNumber());
     }
 
     @Test
@@ -143,7 +131,7 @@ class PolicyRepositoryTest {
         var criteria = new PolicySearchCriteria(null, null, null, null, null,
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 6, 30));
 
-        var result = repository.search(criteria, 0, 10, "id", false);
+        var result = repository.search(criteria, 0, 10, PolicySortField.ID, false);
 
         assertEquals(1, result.totalElements());
         assertEquals("POL-0002", result.content().get(0).policyNumber());

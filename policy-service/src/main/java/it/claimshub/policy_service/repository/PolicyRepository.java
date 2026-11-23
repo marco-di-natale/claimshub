@@ -51,12 +51,8 @@ public class PolicyRepository {
         return findById(id).orElseThrow();
     }
 
-    private static final Map<String, String> SORTABLE = Map.of(
-            "id", "id", "premium", "premium",
-            "startDate", "start_date", "holderName", "holder_name");
-
     public PageResult<Policy> search(PolicySearchCriteria c, int page, int size,
-                                     String sortBy, boolean desc) {
+                                     PolicySortField sortBy, boolean desc) {
         var where = new WhereClause()
                 .and("policy_type = :type", "type", nameOf(c.type()))
                 .and("status = :status", "status", nameOf(c.status()))
@@ -67,7 +63,7 @@ public class PolicyRepository {
                 .and("start_date <= :startTo", "startTo", c.startTo());
 
         // la colonna di ordinamento NON arriva mai dall'utente: whitelist contro SQL injection
-        String orderCol = SORTABLE.getOrDefault(sortBy, "id");
+        String orderCol = sortBy.column();
 
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM policy" + where.sql(),
                 where.params(), Long.class);

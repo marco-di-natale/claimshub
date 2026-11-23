@@ -86,7 +86,7 @@ class PolicyServiceTest {
         var criteria = new PolicySearchCriteria(null, null, null, null, null, null, null);
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.search(criteria, page, size, "id", false));
+                () -> service.search(criteria, page, size, PolicySortField.ID, false));
         verifyNoInteractions(repository);
     }
 
@@ -94,9 +94,9 @@ class PolicyServiceTest {
     void search_delegatesToRepository_whenPagingIsValid() {
         var criteria = new PolicySearchCriteria(PolicyType.AUTO, null, null, null, null, null, null);
         var page = new PageResult<>(List.of(samplePolicy(1L)), 0, 10, 1);
-        when(repository.search(criteria, 0, 10, "id", false)).thenReturn(page);
+        when(repository.search(criteria, 0, 10, PolicySortField.ID, false)).thenReturn(page);
 
-        PageResult<Policy> result = service.search(criteria, 0, 10, "id", false);
+        PageResult<Policy> result = service.search(criteria, 0, 10, PolicySortField.ID, false);
 
         assertEquals(1, result.totalElements());
     }

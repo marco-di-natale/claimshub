@@ -29,7 +29,7 @@ public class PolicyService {
     }
 
     public PageResult<Policy> search(PolicySearchCriteria criteria, int page, int size,
-                                     String sortBy, boolean desc) {
+                                     PolicySortField sortBy, boolean desc) {
         if (page < 0 || size < 1 || size > 100) {
             throw new IllegalArgumentException("page must be >= 0 and size between 1 and 100");
         }

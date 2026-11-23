@@ -260,4 +260,19 @@ class PolicyApiSecurityTest {
                         .with(admin()).header(APP, "test"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void get_withStartDateRange_filtersByIsoDates() throws Exception {
+        mvc.perform(get("/api/policies?startFrom=2026-03-01&startTo=2026-06-30")
+                        .with(agent()).header(APP, "test"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].policyNumber").value("POL-0002"));
+    }
+
+    @Test
+    void get_withInvalidDate_is400() throws Exception {
+        mvc.perform(get("/api/policies?startFrom=ieri").with(agent()).header(APP, "test"))
+                .andExpect(status().isBadRequest());
+    }
 }
