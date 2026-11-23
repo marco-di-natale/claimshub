@@ -1,6 +1,7 @@
 package it.claimshub.claims_service.controller;
 
 import it.claimshub.claims_service.client.PolicyClient;
+import it.claimshub.claims_service.model.HeaderNames;
 import it.claimshub.claims_service.service.PolicyNotFoundException;
 import it.claimshub.claims_service.service.PolicyServiceException;
 import org.junit.jupiter.api.BeforeEach;
@@ -317,21 +318,21 @@ class ClaimsApiTest {
     @Test
     void requestId_isGenerated_echoed_andReplacedWhenMalicious() {
         client.get().uri("/actuator/health").exchange()
-                .expectHeader().exists("X-Request-Id");
+                .expectHeader().exists(HeaderNames.REQUEST_ID);
 
-        client.get().uri("/actuator/health").header("X-Request-Id", "prova-12345678").exchange()
-                .expectHeader().valueEquals("X-Request-Id", "prova-12345678");
+        client.get().uri("/actuator/health").header(HeaderNames.REQUEST_ID, "prova-12345678").exchange()
+                .expectHeader().valueEquals(HeaderNames.REQUEST_ID, "prova-12345678");
 
-        client.get().uri("/actuator/health").header("X-Request-Id", "bad value forged")
+        client.get().uri("/actuator/health").header(HeaderNames.REQUEST_ID, "bad value forged")
                 .exchange()
-                .expectHeader().value("X-Request-Id", v -> assertNotEquals("bad value forged", v));
+                .expectHeader().value(HeaderNames.REQUEST_ID, v -> assertNotEquals("bad value forged", v));
     }
 
     @Test
     void requestId_isPresentAlsoOn401() {
         client.get().uri("/api/claims").exchange()
                 .expectStatus().isUnauthorized()
-                .expectHeader().exists("X-Request-Id");
+                .expectHeader().exists(HeaderNames.REQUEST_ID);
     }
 
     private String createClaim(long policyId, String amount) {
@@ -407,9 +408,11 @@ class ClaimsApiTest {
     @Test
     void search_byCreatedDate_usesIsoDates() {
         createClaim(7007, "100");
-        String today = LocalDate.now(ZoneOffset.UTC).toString();
+        // finestra larga un giorno per lato: vale anche se il test gira a cavallo della mezzanotte
+        String from = LocalDate.now(ZoneOffset.UTC).minusDays(1).toString();
+        String to = LocalDate.now(ZoneOffset.UTC).plusDays(1).toString();
 
-        asAgent().get().uri("/api/claims?policyId=7007&createdFrom=" + today).exchange()
+        asAgent().get().uri("/api/claims?policyId=7007&createdFrom=" + from + "&createdTo=" + to).exchange()
                 .expectStatus().isOk()
                 .expectBody().jsonPath("$.totalElements").isEqualTo(1);
         asAgent().get().uri("/api/claims?policyId=7007&createdTo=2000-01-01").exchange()

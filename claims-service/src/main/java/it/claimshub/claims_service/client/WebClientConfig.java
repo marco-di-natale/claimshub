@@ -1,5 +1,6 @@
 package it.claimshub.claims_service.client;
 
+import it.claimshub.claims_service.model.HeaderNames;
 import it.claimshub.claims_service.web.RequestIdWebFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -29,7 +30,7 @@ public class WebClientConfig {
     // eseguito per OGNI richiesta in uscita: aggiunge token, request id e nome app
     private ExchangeFilterFunction propagationFilter() {
         return (request, next) -> Mono.deferContextual(ctx -> {
-            String requestId = ctx.getOrDefault(RequestIdWebFilter.CTX_KEY, (String) null);
+            String requestId = ctx.getOrDefault(RequestIdWebFilter.CTX_KEY, null);
             return ReactiveSecurityContextHolder.getContext()
                     .map(SecurityContext::getAuthentication)
                     .ofType(JwtAuthenticationToken.class)
@@ -37,10 +38,10 @@ public class WebClientConfig {
                     .defaultIfEmpty(Optional.empty())
                     .flatMap(token -> {
                         ClientRequest.Builder builder = ClientRequest.from(request)
-                                .header("X-Client-App", "claims-service");
+                                .header(HeaderNames.CLIENT_APP, "claims-service");
                         token.ifPresent(t -> builder.header(HttpHeaders.AUTHORIZATION, "Bearer " + t));
                         if (requestId != null) {
-                            builder.header(RequestIdWebFilter.HEADER, requestId);
+                            builder.header(HeaderNames.REQUEST_ID, requestId);
                         }
                         return next.exchange(builder.build());
                     });

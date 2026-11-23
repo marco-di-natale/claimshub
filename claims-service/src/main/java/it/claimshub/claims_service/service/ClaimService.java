@@ -81,9 +81,7 @@ public class ClaimService {
     public Mono<PolicySummary> policySummary(long policyId) {
         var criteria = new ClaimSearchCriteria(null, policyId, null, null, null, null);
         // size enorme: qui servono TUTTI i sinistri della polizza per contarli
-        Mono<List<Claim>> claims = repository
-                .search(criteria, 0, Integer.MAX_VALUE, ClaimSortField.CREATED_AT, true)
-                .map(PageResult::content);
+        Mono<List<Claim>> claims = repository.findByPolicyId(policyId).collectList();
 
         return Mono.zip(policyClient.getPolicy(policyId), claims)
                 .map(t -> new PolicySummary(t.getT1(), stats(t.getT2())));

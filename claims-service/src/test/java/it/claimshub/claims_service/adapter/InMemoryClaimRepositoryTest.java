@@ -7,7 +7,9 @@ import reactor.test.StepVerifier;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -128,6 +130,27 @@ class InMemoryClaimRepositoryTest {
                     assertTrue(p.content().isEmpty());
                     assertEquals(4, p.totalElements());
                 })
+                .verifyComplete();
+    }
+
+    @Test
+    void search_byPolicyId_worksForLargeIds() {
+        repo.save(claim("big1", 100_000L, "10", ClaimStatus.OPEN, "2026-01-10T10:00:00Z")).block();
+        repo.save(claim("big2", 100_001L, "10", ClaimStatus.OPEN, "2026-01-10T10:00:00Z")).block();
+
+        var criteria = new ClaimSearchCriteria(null, 100_000L, null, null, null, null);
+        StepVerifier.create(repo.search(criteria, 0, 10, ClaimSortField.CREATED_AT, false))
+                .assertNext(p -> assertEquals(List.of("big1"), ids(p)))
+                .verifyComplete();
+    }
+
+    @Test
+    void findByPolicyId_returnsOnlyThatPolicy() {
+        seed();   // c1 e c2 sulla polizza 1, c3 e c4 sulla polizza 2
+
+        StepVerifier.create(repo.findByPolicyId(2).map(Claim::id).collectList())
+                .assertNext(found -> assertEquals(
+                        Set.of("c3", "c4"), new HashSet<>(found)))
                 .verifyComplete();
     }
 }

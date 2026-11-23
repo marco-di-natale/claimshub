@@ -1,9 +1,12 @@
 package it.claimshub.policy_service.controller;
 
+import it.claimshub.policy_service.FixedClockConfig;
+import it.claimshub.policy_service.model.HeaderNames;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
@@ -20,12 +23,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
+@Import(FixedClockConfig.class)
 class PolicyApiSecurityTest {
 
     @Autowired
     MockMvc mvc;
 
-    private static final String APP = "X-Client-App";
+    private static final String APP = HeaderNames.CLIENT_APP;
 
     private static final String NEW_POLICY = """
         {"policyNumber":"POL-0777","holderName":"Test Api","type":"AUTO",
@@ -139,16 +143,16 @@ class PolicyApiSecurityTest {
     @Test
     void response_alwaysCarriesRequestId() throws Exception {
         mvc.perform(get("/actuator/health"))
-           .andExpect(header().exists("X-Request-Id"));
+           .andExpect(header().exists(HeaderNames.REQUEST_ID));
     }
 
     @Test
     void requestId_isEchoed_whenValid_andReplaced_whenMalicious() throws Exception {
-        mvc.perform(get("/actuator/health").header("X-Request-Id", "prova-12345678"))
-           .andExpect(header().string("X-Request-Id", "prova-12345678"));
+        mvc.perform(get("/actuator/health").header(HeaderNames.REQUEST_ID, "prova-12345678"))
+           .andExpect(header().string(HeaderNames.REQUEST_ID, "prova-12345678"));
 
-        mvc.perform(get("/actuator/health").header("X-Request-Id", "bad value\nforged log line"))
-           .andExpect(header().string("X-Request-Id", not("bad value\nforged log line")));
+        mvc.perform(get("/actuator/health").header(HeaderNames.REQUEST_ID, "bad value\nforged log line"))
+           .andExpect(header().string(HeaderNames.REQUEST_ID, not("bad value\nforged log line")));
     }
 
     // ---------- login ----------
@@ -226,5 +230,34 @@ class PolicyApiSecurityTest {
     void renew_asAgent_is403() throws Exception {
         mvc.perform(patch("/api/policies/1/renew").with(agent()).header(APP, "test"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void reports_admin_gets200() throws Exception {
+        mvc.perform(get("/api/reports/premium-ranking").with(admin()).header(APP, "test"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].rank").value(1));
+    }
+
+    @Test
+    void reports_agent_gets403() throws Exception {
+        mvc.perform(get("/api/reports/premiums-by-type").with(agent()).header(APP, "test"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void reports_withoutToken_gets401() throws Exception {
+        mvc.perform(get("/api/reports/monthly-new-policies"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void reports_invalidParameters_get400() throws Exception {
+        mvc.perform(get("/api/reports/premiums-by-type?minPolicies=0")
+                        .with(admin()).header(APP, "test"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/reports/premiums-by-type?status=BOH")
+                        .with(admin()).header(APP, "test"))
+                .andExpect(status().isBadRequest());
     }
 }

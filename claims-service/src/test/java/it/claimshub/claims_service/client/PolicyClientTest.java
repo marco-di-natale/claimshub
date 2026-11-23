@@ -1,5 +1,6 @@
 package it.claimshub.claims_service.client;
 
+import it.claimshub.claims_service.model.HeaderNames;
 import it.claimshub.claims_service.service.PolicyNotFoundException;
 import it.claimshub.claims_service.service.PolicyServiceException;
 import it.claimshub.claims_service.web.RequestIdWebFilter;
@@ -127,7 +128,7 @@ class PolicyClientTest {
         assertNotNull(request);
         assertEquals("/api/policies/1", request.getPath());
         assertEquals("Bearer token-di-prova", request.getHeader("Authorization"));
-        assertEquals("req-12345678", request.getHeader("X-Request-Id"));
-        assertEquals("claims-service", request.getHeader("X-Client-App"));
+        assertEquals("req-12345678", request.getHeader(HeaderNames.REQUEST_ID));
+        assertEquals("claims-service", request.getHeader(HeaderNames.CLIENT_APP));
     }
 }

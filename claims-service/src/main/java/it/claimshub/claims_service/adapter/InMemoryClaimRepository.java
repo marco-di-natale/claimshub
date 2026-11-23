@@ -6,6 +6,7 @@ import it.claimshub.claims_service.model.ClaimSortField;
 import it.claimshub.claims_service.model.PageResult;
 import it.claimshub.claims_service.port.ClaimRepository;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Comparator;
@@ -54,5 +55,12 @@ public class InMemoryClaimRepository implements ClaimRepository {
                     .toList();
             return new PageResult<>(content, page, size, matching.size());
         });
+    }
+
+    @Override
+    public Flux<Claim> findByPolicyId(long policyId) {
+        return Flux.defer(() -> Flux.fromIterable(store.values().stream()
+                .filter(c -> c.policyId() == policyId)
+                .toList()));
     }
 }
