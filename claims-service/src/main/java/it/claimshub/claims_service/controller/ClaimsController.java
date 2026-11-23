@@ -97,4 +97,9 @@ public class ClaimsController {
                 .header("X-Content-Type-Options", "nosniff")
                 .body(d.content()));
     }
+
+    @GetMapping("/policy/{policyId}/summary")
+    public Mono<PolicySummary> summary(@PathVariable long policyId) {
+        return service.policySummary(policyId);
+    }
 }

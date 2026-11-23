@@ -9,7 +9,11 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -72,6 +76,29 @@ public class ClaimService {
 
     public Flux<ClaimEvent> history(String id) {
         return findById(id).thenMany(history.findByClaimId(id));
+    }
+
+    public Mono<PolicySummary> policySummary(long policyId) {
+        var criteria = new ClaimSearchCriteria(null, policyId, null, null, null, null);
+        // size enorme: qui servono TUTTI i sinistri della polizza per contarli
+        Mono<List<Claim>> claims = repository
+                .search(criteria, 0, Integer.MAX_VALUE, ClaimSortField.CREATED_AT, true)
+                .map(PageResult::content);
+
+        return Mono.zip(policyClient.getPolicy(policyId), claims)
+                .map(t -> new PolicySummary(t.getT1(), stats(t.getT2())));
+    }
+
+    private static PolicySummary.ClaimStats stats(List<Claim> claims) {
+        BigDecimal total = claims.stream()
+                .map(Claim::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<ClaimStatus, Long> byStatus = new EnumMap<>(ClaimStatus.class);
+        for (ClaimStatus s : ClaimStatus.values()) {
+            byStatus.put(s, 0L);              // anche gli stati vuoti compaiono, a zero
+        }
+        claims.forEach(c -> byStatus.merge(c.status(), 1L, Long::sum));
+        return new PolicySummary.ClaimStats(claims.size(), total, byStatus);
     }
 
 }
