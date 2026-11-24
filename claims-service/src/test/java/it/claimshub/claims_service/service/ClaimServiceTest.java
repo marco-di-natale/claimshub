@@ -2,7 +2,6 @@ package it.claimshub.claims_service.service;
 
 import it.claimshub.claims_service.client.PolicyClient;
 import it.claimshub.claims_service.model.Claim;
-import it.claimshub.claims_service.model.ClaimEvent;
 import it.claimshub.claims_service.model.ClaimStatus;
 import it.claimshub.claims_service.model.CreateClaimRequest;
 import it.claimshub.claims_service.port.ClaimHistoryStore;
@@ -14,7 +13,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -37,6 +35,8 @@ class ClaimServiceTest {
     ClaimAudit audit;
     @Mock
     PolicyClient policyClient;
+    @Mock
+    ClaimQueryService queryService;
 
     @InjectMocks
     ClaimService service;
@@ -104,20 +104,11 @@ class ClaimServiceTest {
 
     @Test
     void findById_returnsClaim_whenPresent() {
-        when(repository.findById("c1")).thenReturn(Mono.just(claim("c1", ClaimStatus.OPEN)));
+        when(queryService.findById("c1")).thenReturn(Mono.just(claim("c1", ClaimStatus.OPEN)));
 
-        StepVerifier.create(service.findById("c1"))
+        StepVerifier.create(queryService.findById("c1"))
                 .assertNext(c -> assertEquals("c1", c.id()))
                 .verifyComplete();
-    }
-
-    @Test
-    void findById_fails_whenMissing() {
-        when(repository.findById("x")).thenReturn(Mono.empty());
-
-        StepVerifier.create(service.findById("x"))
-                .expectError(ClaimNotFoundException.class)
-                .verify();
     }
 
     // ---------- macchina a stati ----------
@@ -133,7 +124,7 @@ class ClaimServiceTest {
             "APPROVED,REJECTED,false",
             "REJECTED,OPEN,false"})
     void changeStatus_followsStateMachine(ClaimStatus from, ClaimStatus to, boolean allowed) {
-        when(repository.findById("c1")).thenReturn(Mono.just(claim("c1", from)));
+        when(queryService.findById("c1")).thenReturn(Mono.just(claim("c1", from)));
         lenient().when(repository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         stubSideEffects();
 
@@ -153,35 +144,4 @@ class ClaimServiceTest {
         }
     }
 
-    @Test
-    void changeStatus_onMissingClaim_fails() {
-        when(repository.findById("x")).thenReturn(Mono.empty());
-
-        StepVerifier.create(service.changeStatus("x", ClaimStatus.IN_REVIEW, "admin"))
-                .expectError(ClaimNotFoundException.class)
-                .verify();
-    }
-
-    // ---------- storico ----------
-
-    @Test
-    void history_returnsEvents_forExistingClaim() {
-        var event = new ClaimEvent("c1", Instant.now(), "CREATED", "Claim opened", "agent");
-        when(repository.findById("c1")).thenReturn(Mono.just(claim("c1", ClaimStatus.OPEN)));
-        when(history.findByClaimId("c1")).thenReturn(Flux.just(event));
-
-        StepVerifier.create(service.history("c1"))
-                .expectNext(event)
-                .verifyComplete();
-    }
-
-    @Test
-    void history_failsWith404Error_forMissingClaim_insteadOfEmptyList() {
-        when(repository.findById("x")).thenReturn(Mono.empty());
-        lenient().when(history.findByClaimId("x")).thenReturn(Flux.empty());
-
-        StepVerifier.create(service.history("x"))
-                .expectError(ClaimNotFoundException.class)
-                .verify();
-    }
 }

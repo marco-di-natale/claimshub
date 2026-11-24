@@ -28,7 +28,7 @@ class PolicySummaryServiceTest {
     @Mock
     PolicyClient policyClient;
     @InjectMocks
-    ClaimService service;
+    ClaimQueryService service;
 
     private Claim claim(String id, String amount, ClaimStatus status) {
         return new Claim(id, 5L, "x", new BigDecimal(amount), status,

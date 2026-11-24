@@ -30,7 +30,7 @@ class ClaimSearchServiceTest {
     @Mock
     ClaimRepository repository;
     @InjectMocks
-    ClaimService service;
+    ClaimQueryService service;
 
     private ClaimSearchCriteria none() {
         return new ClaimSearchCriteria(null, null, null, null, null, null);

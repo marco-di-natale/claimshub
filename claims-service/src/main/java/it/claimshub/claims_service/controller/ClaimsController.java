@@ -1,6 +1,7 @@
 package it.claimshub.claims_service.controller;
 
 import it.claimshub.claims_service.model.*;
+import it.claimshub.claims_service.service.ClaimQueryService;
 import it.claimshub.claims_service.service.ClaimService;
 import it.claimshub.claims_service.service.DocumentService;
 import jakarta.validation.Valid;
@@ -27,6 +28,7 @@ public class ClaimsController {
     }
 
     private final ClaimService service;
+    private final ClaimQueryService queries;
     private final DocumentService documentService;
 
     @GetMapping("/whoami")
@@ -48,17 +50,17 @@ public class ClaimsController {
             @RequestParam(defaultValue = "true") boolean desc) {
         var criteria = new ClaimSearchCriteria(status, policyId, minAmount, maxAmount,
                 createdFrom, createdTo);
-        return service.search(criteria, page, size, sortBy, desc);
+        return queries.search(criteria, page, size, sortBy, desc);
     }
 
     @GetMapping("/{id}")
     public Mono<Claim> get(@PathVariable String id) {
-        return service.findById(id);
+        return queries.findById(id);
     }
 
     @GetMapping("/{id}/history")
     public Flux<ClaimEvent> history(@PathVariable String id) {
-        return service.history(id);
+        return queries.history(id);
     }
 
     @PostMapping
@@ -100,6 +102,6 @@ public class ClaimsController {
 
     @GetMapping("/policy/{policyId}/summary")
     public Mono<PolicySummary> summary(@PathVariable long policyId) {
-        return service.policySummary(policyId);
+        return queries.policySummary(policyId);
     }
 }

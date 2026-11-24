@@ -26,7 +26,7 @@ public class DocumentService {
     private static final Set<String> ALLOWED_TYPES =
             Set.of("application/pdf", "image/png", "image/jpeg");
 
-    private final ClaimService claimService;
+    private final ClaimQueryService claimQueryService;
     private final DocumentStore store;
     private final DocumentMetadataRepository metadata;
     private final ClaimAudit audit;
@@ -39,7 +39,7 @@ public class DocumentService {
                     "Unsupported file type (allowed: PDF, PNG, JPEG)"));
         }
 
-        return claimService.findById(claimId)          // il sinistro deve esistere
+        return claimQueryService.findById(claimId)          // il sinistro deve esistere
                 .then(readBytes(file))
                 .flatMap(bytes -> {
                     if (bytes.length == 0) {
@@ -56,11 +56,11 @@ public class DocumentService {
     }
 
     public Flux<DocumentInfo> list(String claimId) {
-        return claimService.findById(claimId).thenMany(metadata.findByClaimId(claimId));
+        return claimQueryService.findById(claimId).thenMany(metadata.findByClaimId(claimId));
     }
 
     public Mono<DocumentContent> download(String claimId, String docId) {
-        return claimService.findById(claimId)
+        return claimQueryService.findById(claimId)
                 .then(metadata.findById(docId))
                 .filter(info -> info.claimId().equals(claimId))
                 .switchIfEmpty(Mono.error(new DocumentNotFoundException(docId)))
