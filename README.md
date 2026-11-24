@@ -1,163 +1,157 @@
 # ClaimsHub
 
-Mini sistema assicurativo per la gestione di **polizze** e **sinistri**, composto da due microservizi REST. Progetto di pratica per esercitarsi su Java, Spring, sicurezza, testing e integrazione tra servizi.
+A small insurance back office made of **two cooperating Spring Boot services**: one manages policies, the other manages claims filed against them. It is a practice project that puts a typical enterprise Java stack to work end to end: REST APIs, JWT security, SQL, reactive programming, testing, containers and CI.
 
-> Stato: i due servizi sono completi e testati. I componenti AWS, Oracle, Docker, Jenkins e SonarQube sono simulati o rimandati (vedi la tabella "Cosa è simulato").
+> This project was built with the help of Claude, an AI assistant from Anthropic, as a learning exercise. I reviewed, ran and tested the result.
 
-## Architettura
-
-```
-                 POST /auth/login
-   client  ───────────────────────────►  policy-service  (8080)
-     │                                    Spring MVC, Spring JDBC, H2 (modalità Oracle)
-     │  Authorization: Bearer <JWT>       emette e valida i JWT
-     │
-     │                                         ▲
-     │  Authorization: Bearer <JWT>            │ WebClient
-     └──────────────────────────►  claims-service  (8081)
-                                    WebFlux, valida lo stesso JWT
-                                    propaga token, X-Request-Id, X-Client-App
-                                    │
-                       ┌────────────┼─────────────────┐
-                       ▼            ▼                 ▼
-               DocumentStore   ClaimHistoryStore   NotificationPublisher
-               (porta, S3)     (porta, DynamoDB)   (porta, SQS)
-```
-
-Ogni sinistro appartiene a una polizza: alla creazione, claims-service chiede a policy-service se la polizza esiste ed è `ACTIVE`.
-
-### Architettura a porte
-
-claims-service non parla mai direttamente con AWS. Il service dipende da **interfacce** (porte), e le tecnologie concrete sono **adapter** intercambiabili. Oggi gli adapter sono in memoria o su file locali. Per passare ad AWS si scrive un nuovo adapter che implementa la stessa interfaccia, senza modificare il service.
-
-## Stack
-
-| Area | Tecnologie |
-|---|---|
-| Linguaggio | Java 21 |
-| Framework | Spring Boot (Spring MVC, Spring WebFlux), Spring JDBC |
-| Sicurezza | Spring Security, OAuth2 Resource Server, JWT (HS256) |
-| Dati | H2 in modalità Oracle |
-| Build | Maven (policy-service), Gradle (claims-service) |
-| Test | JUnit 5, Mockito, MockMvc, WebTestClient, StepVerifier, MockWebServer, JaCoCo |
-| API docs | Swagger / OpenAPI (springdoc) |
-
-## Struttura del repository
+## Architecture
 
 ```
-claimshub/
-├── policy-service/    # Maven, porta 8080
-├── claims-service/    # Gradle, porta 8081
-└── README.md
+            ┌──────────────────────────┐        ┌───────────────────────────┐
+  client ──►│  policy-service  :8080   │◄───────│   claims-service  :8081   │◄── client
+            │  Spring MVC + JDBC       │  REST  │   Spring WebFlux          │
+            │  H2 (Oracle mode)        │  + JWT │   in-memory adapters      │
+            │  issues the JWT          │        │   (ports & adapters)      │
+            └──────────────────────────┘        └───────────────────────────┘
 ```
 
-## Come avviare il progetto
-
-Requisiti: JDK 21, Git. Maven e Gradle arrivano dai wrapper (`mvnw`, `gradlew`).
-
-I due servizi devono condividere lo **stesso segreto JWT**. Genera una chiave casuale (PowerShell):
-
-```powershell
-$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
-```
-
-**policy-service** (porta 8080):
-
-```powershell
-cd policy-service
-$env:JWT_SECRET = "<la chiave>"
-.\mvnw.cmd spring-boot:run
-```
-
-**claims-service** (porta 8081), in un altro terminale:
-
-```powershell
-cd claims-service
-$env:JWT_SECRET = "<la stessa chiave>"
-.\gradlew.bat bootRun
-```
-
-Il segreto non va mai scritto nel codice né committato.
-
-### Utenti demo (solo per pratica)
-
-| Utente | Password | Ruolo |
+| | policy-service | claims-service |
 |---|---|---|
-| `agent` | `agent123` | AGENT |
-| `admin` | `admin123` | ADMIN |
+| Style | Spring MVC (blocking) | Spring WebFlux (reactive) |
+| Build | Maven | Gradle |
+| Data | H2 in Oracle mode, `NamedParameterJdbcTemplate`, sequence + `DUAL`, `OFFSET/FETCH` | in-memory repositories behind ports |
+| Role | owns policies, issues JWTs, SQL reports | owns claims, calls policy-service to validate policies |
 
-Gli utenti sono in memoria. In un sistema reale starebbero in un database o in un identity provider.
+**Stack:** Java 21, Spring Boot 4.1, Spring Security (resource server), springdoc OpenAPI, JUnit 5, Mockito, MockMvc, WebTestClient, Reactor Test, MockWebServer, JaCoCo, Docker, Jenkins.
+
+## Quick start
+
+Requirements: JDK 21. Both services must share the same signing secret (at least 32 characters).
+
+```bash
+export JWT_SECRET="change-me-to-a-long-random-string-123456"
+
+# terminal 1
+cd policy-service && mvn spring-boot:run
+
+# terminal 2
+cd claims-service && ./gradlew bootRun
+```
+
+With Docker:
+
+```bash
+echo "JWT_SECRET=change-me-to-a-long-random-string-123456" > .env
+docker compose up --build
+```
+
+Try it (demo users: `agent` / `agent123` with role `AGENT`, `admin` / `admin123` with role `ADMIN`):
+
+```bash
+# 1. log in: the response contains the JWT
+curl -X POST http://localhost:8080/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"agent","password":"agent123"}'
+
+# 2. call the API with the token (the X-Client-App header is mandatory on /api/**)
+curl http://localhost:8080/api/policies \
+     -H "Authorization: Bearer <token>" -H "X-Client-App: demo"
+```
+
+OpenAPI documentation is served by policy-service through springdoc (`/swagger-ui.html`). Health checks are at `/actuator/health`.
 
 ## API
 
-Tutte le chiamate a `/api/**` richiedono il token (`Authorization: Bearer ...`). Su policy-service serve anche l'header `X-Client-App`.
+### policy-service (`:8080`)
 
-### policy-service (8080)
-
-| Metodo | Percorso | Ruoli | Descrizione |
+| Method | Path | Roles | Description |
 |---|---|---|---|
-| POST | `/auth/login` | pubblico | emette il JWT |
-| GET | `/api/policies` | AGENT, ADMIN | ricerca con filtri, ordinamento e paginazione |
-| GET | `/api/policies/{id}` | AGENT, ADMIN | dettaglio |
-| GET | `/api/policies/stats` | AGENT, ADMIN | statistiche per tipo e stato |
-| POST | `/api/policies` | ADMIN | crea una polizza |
-| GET | `/swagger-ui.html` | pubblico | documentazione OpenAPI |
+| POST | `/auth/login` | public | returns a signed JWT |
+| GET | `/api/policies` | AGENT, ADMIN | search with filters (`type`, `status`, `minPremium`, `maxPremium`, `holderName`, `startFrom`, `startTo` as `YYYY-MM-DD`), sorting (`sortBy`: `ID`, `PREMIUM`, `START_DATE`, `HOLDER_NAME`; `desc`) and pagination (`page`, `size`) |
+| GET | `/api/policies/{id}` | AGENT, ADMIN | one policy |
+| GET | `/api/policies/stats` | AGENT, ADMIN | count and total premium by type and status |
+| POST | `/api/policies` | ADMIN | create a policy (status starts as `ACTIVE`) |
+| PATCH | `/api/policies/{id}/cancel` | ADMIN | cancel an active policy (409 otherwise) |
+| PATCH | `/api/policies/{id}/renew` | ADMIN | renew for one year (409 if cancelled or if the new end date is already past) |
+| GET | `/api/reports/premiums-by-type` | ADMIN | `GROUP BY` / `HAVING`: count, sum, average, min, max per type (`status`, `minPolicies`) |
+| GET | `/api/reports/premium-ranking` | ADMIN | window functions: `RANK() OVER (PARTITION BY ...)` and each policy's share of its type |
+| GET | `/api/reports/monthly-new-policies` | ADMIN | new policies per month with a running total (`SUM(SUM(...)) OVER`) |
 
-Filtri di ricerca: `type`, `status`, `minPremium`, `maxPremium`, `holderName`, `startFrom`, `startTo`, più `page`, `size` (max 100), `sortBy`, `desc`.
+Policy lifecycle: `ACTIVE` → `CANCELLED` or `EXPIRED`; a cancelled policy cannot be renewed.
 
-### claims-service (8081)
+### claims-service (`:8081`)
 
-| Metodo | Percorso | Ruoli | Descrizione |
+| Method | Path | Roles | Description |
 |---|---|---|---|
-| GET | `/api/claims`, `/api/claims/{id}` | AGENT, ADMIN | elenco e dettaglio |
-| POST | `/api/claims` | AGENT, ADMIN | apre un sinistro (la polizza deve essere ACTIVE) |
-| PATCH | `/api/claims/{id}/status` | ADMIN | cambia stato |
-| GET | `/api/claims/{id}/history` | AGENT, ADMIN | storico eventi |
-| POST | `/api/claims/{id}/documents` | AGENT, ADMIN | carica un documento (PDF, PNG, JPEG, max 5 MB) |
-| GET | `/api/claims/{id}/documents` | AGENT, ADMIN | elenco documenti |
-| GET | `/api/claims/{id}/documents/{docId}` | AGENT, ADMIN | scarica un documento |
+| POST | `/api/claims` | AGENT, ADMIN | open a claim (the policy must exist and be active in policy-service) |
+| GET | `/api/claims` | AGENT, ADMIN | search with filters (`status`, `policyId`, `minAmount`, `maxAmount`, `createdFrom`, `createdTo`), sorting (`sortBy`: `CREATED_AT`, `AMOUNT`; `desc`) and pagination (`page`, `size`, max 100) |
+| GET | `/api/claims/{id}` | AGENT, ADMIN | one claim |
+| PATCH | `/api/claims/{id}/status` | ADMIN | change status (409 if the transition is not allowed) |
+| GET | `/api/claims/{id}/history` | AGENT, ADMIN | audit trail of the claim |
+| GET | `/api/claims/policy/{policyId}/summary` | AGENT, ADMIN | the policy (from policy-service) plus claim statistics, fetched in parallel with `Mono.zip` |
+| POST / GET | `/api/claims/{id}/documents`, `/{docId}` | AGENT, ADMIN | upload (type and size checks), list and download documents |
+| GET | `/api/claims/whoami` | AGENT, ADMIN | the authenticated user and roles |
 
-Macchina a stati dei sinistri: `OPEN → IN_REVIEW → APPROVED | REJECTED`. `APPROVED` e `REJECTED` sono finali.
+Claim lifecycle, enforced by a state machine inside the `ClaimStatus` enum:
 
-### Formato degli errori
-
-```json
-{ "timestamp": "...", "status": 404, "error": "Not Found", "message": "Claim not found: ..." }
+```
+OPEN ──► IN_REVIEW ──► APPROVED   (final)
+                  └──► REJECTED   (final)
 ```
 
-Codici principali: 400 validazione, 401 non autenticato, 403 non autorizzato, 404 non trovato, 409 conflitto (duplicato o transizione non valida), 413 file troppo grande, 422 polizza non valida per il sinistro, 502 policy-service non raggiungibile.
+Errors use one consistent JSON body (`timestamp`, `status`, `error`, `message`) and a deliberate set of codes: 400 malformed request, 401 not authenticated, 403 not allowed, 404 not found, 409 conflict with the current state, 413 payload too large, 502 policy-service unavailable.
 
-## Scelte di sicurezza
+## Security
 
-- Le regole di accesso terminano con `denyAll`: ciò che non è permesso esplicitamente è vietato.
-- Il JWT è firmato; il segreto arriva da variabile d'ambiente.
-- Messaggio identico per utente inesistente e password sbagliata.
-- `X-Request-Id` accettato solo in formato sicuro (contro la log injection) e propagato tra i servizi.
-- L'ordinamento della ricerca usa una whitelist di colonne (contro la SQL injection); i parametri sono sempre bind.
-- Upload: whitelist dei tipi, limite di dimensione, chiave di archiviazione generata dal server, nome file ripulito, `Content-Disposition: attachment` e `nosniff` in download.
-- Un documento si scarica solo passando il sinistro a cui appartiene.
+- **JWT (HS256)** issued by policy-service and validated by both services as OAuth2 resource servers; the secret comes from the `JWT_SECRET` environment variable.
+- **Roles** `AGENT` (read, open claims, upload documents) and `ADMIN` (write operations and reports).
+- **Deny by default:** any path not explicitly allowed answers 403.
+- **JSON 401 and 403** responses instead of empty bodies.
+- **`X-Client-App`** is required on `/api/**` (400 otherwise).
+- **`X-Request-Id`** is generated or accepted (after a format check, to prevent log injection), put in the log context, returned in the response and propagated from claims-service to policy-service together with the bearer token.
+- **SQL injection:** values always travel as named parameters; the only dynamic SQL fragments are constants chosen in code (sort columns come from an enum).
+- **Uploads:** type and size are validated and downloads are served with `X-Content-Type-Options: nosniff` and `Content-Disposition: attachment`.
 
-## Test
+## Design notes
 
-```powershell
-cd policy-service ; .\mvnw.cmd test          # report copertura: target/site/jacoco/index.html
-cd claims-service ; .\gradlew.bat test       # report copertura: build/reports/jacoco/test/html/index.html
+- **Ports and adapters in claims-service.** Repository, history, notifications and document storage are interfaces; the running adapters are in memory. AWS adapters (S3, DynamoDB, SQS) exist for a separate `aws` profile, so the business code never knows which one it uses.
+- **Lazy reactive adapters.** Blocking work is wrapped (`Mono.fromSupplier`, `Flux.defer`) so nothing runs until someone subscribes.
+- **Read/write split.** `ClaimQueryService` has no side effects; `ClaimService` writes, records history and notifies.
+- **Calling policy-service.** `WebClient` with a timeout; HTTP errors are translated into domain exceptions (404 for an unknown policy, 502 when the service is down).
+- **Optimistic concurrency.** Policy transitions use `UPDATE ... WHERE status = :expected`, so a concurrent change fails instead of being overwritten.
+- **Injected `Clock`.** Business rules that depend on today's date receive a `Clock`, so tests use a fixed instant and never depend on the calendar.
+- **Enums instead of free strings** for sorting and status, so invalid values are rejected before reaching the business code.
+- **No shared library** between the two services: they only share the contract (header names, JWT format), so they can be released independently.
+
+## Testing
+
+```bash
+cd policy-service && mvn test
+cd claims-service && ./gradlew test
 ```
 
-| Livello | Strumenti |
-|---|---|
-| Unit test dei service | JUnit 5, Mockito, StepVerifier |
-| Repository su database | `@SpringBootTest` con H2 |
-| Client HTTP verso policy-service | MockWebServer (200, 404, 401, 500, timeout, server spento, header propagati) |
-| API e sicurezza | MockMvc (policy-service), WebTestClient (claims-service) |
+- Unit tests with JUnit 5 and Mockito; reactive code with `StepVerifier`.
+- Repository tests on H2 using the real SQL, including the reports.
+- API tests with MockMvc (policy-service) and WebTestClient (claims-service), covering 401, 403, validation, state conflicts and the happy paths.
+- `MockWebServer` for the HTTP client that calls policy-service (timeouts, 404, 5xx).
+- JaCoCo coverage reports for both services.
 
-## Cosa è simulato
+## Containers and CI
 
-| Componente | Oggi | Sostituto previsto | Dove cambia |
-|---|---|---|---|
-| OracleDB | H2 in modalità Oracle | OracleDB in container | solo configurazione del datasource |
-| S3 (documenti) | cartella locale (`LocalDocumentStore`) | `S3DocumentStore` su LocalStack | nuovo adapter di `DocumentStore` |
-| DynamoDB (storico) | mappa in memoria | adapter DynamoDB su LocalStack | nuovo adapter di `ClaimHistoryStore` |
-| SQS (notifiche) | log (`LoggingNotificationPublisher`) | adapter SQS su LocalStack | nuovo adapter di `NotificationPublisher` |
-| Metadati dei sinistri e dei documenti | mappe in memoria | DynamoDB o database | nuovi adapter delle porte repository |
-| SonarQube, Nexus IQ | non presenti | SonarQube e OWASP Dependency-Check in container | pipeline CI |
+- Multi-stage Dockerfiles using Spring Boot layered jars.
+- `docker-compose.yml` runs both services; the secret comes from `.env`.
+- A `Jenkinsfile` builds and tests both services in parallel, publishes the test and coverage reports and builds the Docker images. An OWASP Dependency-Check stage is available as a switchable option.
+
+## Known limitations
+
+- **AWS adapters** are implemented and tested with mocks, but have **not been verified against an emulator or real AWS**; by default the service runs on the in-memory adapters.
+- Claims and their history live in memory and are lost on restart. The policy summary counts in memory; with a real database it would be an aggregate query.
+- Users are in memory and the JWT secret is shared. In production: an identity provider, asymmetric keys and rotation.
+- Not implemented: GraphQL, SOAP and SonarQube.
+
+## Possible next steps
+
+- Persist claims in a relational database (Flyway migrations).
+- Verify the AWS profile against an emulator.
+- Add SonarQube analysis to the pipeline.
+- Idempotency keys on claim creation; a server-sent-events stream of claim changes.
