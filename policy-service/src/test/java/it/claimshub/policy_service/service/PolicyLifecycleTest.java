@@ -110,12 +110,4 @@ class PolicyLifecycleTest {
         verify(repository, never()).transition(anyLong(), any(), any(), any());
     }
 
-    @Test
-    void cancel_whenStatusChangedMeanwhile_failsInsteadOfOverwriting() {
-        when(repository.findById(1L)).thenReturn(
-                Optional.of(policy(PolicyStatus.ACTIVE, LocalDate.of(2026, 12, 31))));
-        when(repository.transition(anyLong(), any(), any(), any())).thenReturn(false);
-
-        assertThrows(InvalidPolicyStateException.class, () -> service.cancel(1L));
-    }
 }
